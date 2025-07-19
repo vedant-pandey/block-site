@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "Social Media Blocker",
+  "version": "1.0",
+  "description": "A Chrome extension that blocks social media websites.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Block websites"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting",
+    "webRequest",
+    "webRequestBlocking"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [ "blocked.html" ],
+      "matches": [ "<all_urls>" ]
+    }
+  ]
+}
