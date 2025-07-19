@@ -1,11 +1,239 @@
-<!-- blocked.html -->
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Site Blocked</title>
-  </head>
-  <body>
-    <h1>This website is blocked during study hours!</h1>
-  </body>
-</html>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 60px 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            max-width: 500px;
+            margin: 20px;
+        }
+        
+        .icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin: 0 0 20px 0;
+            font-weight: 300;
+        }
+        
+        .blocked-site {
+            font-size: 1.3em;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            word-break: break-all;
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .time-info {
+            margin: 30px 0;
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .schedule-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .next-access {
+            font-weight: bold;
+            color: #4ecdc4;
+            margin-top: 10px;
+        }
+        
+        .actions {
+            margin-top: 30px;
+        }
+        
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 25px;
+            margin: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        .productivity-tip {
+            margin-top: 40px;
+            font-style: italic;
+            opacity: 0.8;
+            font-size: 0.95em;
+        }
+        
+        .clock {
+            font-family: 'Courier New', monospace;
+            font-size: 1.5em;
+            margin: 20px 0;
+            color: #4ecdc4;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🚫</div>
+        <h1>Access Blocked</h1>
+        
+        <div class="blocked-site" id="siteName">
+            Loading...
+        </div>
+        
+        <div class="time-info">
+            <div>Blocked at: <span id="blockTime"></span></div>
+            <div class="clock" id="currentTime"></div>
+        </div>
+        
+        <div class="schedule-info" id="scheduleInfo">
+            <div>📅 Today's Schedule: <span id="todaySchedule"></span></div>
+            <div class="next-access" id="nextAccess"></div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn" onclick="goBack()">← Go Back</button>
+            <button class="btn" onclick="openOptions()">⚙️ Settings</button>
+        </div>
+        
+        <div class="productivity-tip" id="tip">
+            💡 Use this time to focus on your important tasks!
+        </div>
+    </div>
 
+    <script>
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const blockedSite = urlParams.get('site') || 'this website';
+        const blockTime = urlParams.get('time') || new Date().toLocaleTimeString();
+        
+        // Set blocked site name
+        document.getElementById('siteName').textContent = blockedSite;
+        document.getElementById('blockTime').textContent = blockTime;
+        
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // Load schedule information
+        function loadScheduleInfo() {
+            chrome.storage.sync.get(['dailySchedule'], (result) => {
+                const now = new Date();
+                const dayIndex = now.getDay();
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                
+                if (result.dailySchedule && result.dailySchedule[dayIndex]) {
+                    const schedule = result.dailySchedule[dayIndex];
+                    const dayName = days[dayIndex];
+                    
+                    if (schedule.enabled) {
+                        document.getElementById('todaySchedule').textContent = 
+                            `${dayName}: ${schedule.startTime} - ${schedule.endTime}`;
+                        
+                        // Calculate next access time
+                        const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
+                        const nextAccess = new Date();
+                        nextAccess.setHours(endHour, endMinute, 0, 0);
+                        
+                        if (nextAccess <= now) {
+                            nextAccess.setDate(nextAccess.getDate() + 1);
+                        }
+                        
+                        document.getElementById('nextAccess').textContent = 
+                            `Next access available: ${nextAccess.toLocaleString()}`;
+                    } else {
+                        document.getElementById('scheduleInfo').innerHTML = 
+                            '<div>📅 Blocking is disabled for today</div>';
+                    }
+                } else {
+                    document.getElementById('scheduleInfo').innerHTML = 
+                        '<div>📅 24/7 blocking is active</div>';
+                }
+            });
+        }
+        
+        // Load productivity tips
+        const tips = [
+            "💡 Use this time to focus on your important tasks!",
+            "🎯 Take a deep breath and prioritize your goals",
+            "📚 Perfect time to read that book you've been meaning to start",
+            "🏃‍♂️ Why not take a quick walk and get some fresh air?",
+            "🧘‍♀️ Consider a few minutes of meditation or mindfulness",
+            "💪 Use this momentum to tackle challenging work tasks",
+            "🎨 Channel your energy into something creative",
+            "📞 Good time to call a friend or family member",
+            "📝 Write down your thoughts or plan your day",
+            "🌱 Water your plants or do a quick household task"
+        ];
+        
+        document.getElementById('tip').textContent = tips[Math.floor(Math.random() * tips.length)];
+        
+        // Button functions
+        function goBack() {
+            window.history.back();
+        }
+        
+        function openOptions() {
+            chrome.runtime.openOptionsPage();
+        }
+        
+        // Load schedule info on page load
+        loadScheduleInfo();
+        
+        // Add some visual flair
+        document.querySelector('.icon').classList.add('pulse');
+    </script>
+</body>
+</html>

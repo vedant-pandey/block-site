@@ -1,36 +1,44 @@
 {
   "manifest_version": 3,
-  "name": "Social Media Blocker",
-  "version": "1.0",
-  "description": "A Chrome extension that blocks social media websites.",
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "Block websites"
-  },
-  "background": {
-    "service_worker": "background.js"
-  },
+  "name": "Block Site - Time Based",
+  "version": "2.0.0",
+  "description": "Block distracting websites with customizable daily time schedules",
+  
   "permissions": [
+    "storage",
     "tabs",
-    "activeTab",
-    "scripting",
-    "webRequest",
-    "webRequestBlocking"
+    "webNavigation",
+    "activeTab"
   ],
+  
   "host_permissions": [
-    "*://*/*"
+    "<all_urls>"
   ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
   "content_scripts": [
     {
-      "matches": ["*://*/*"],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_end"
+      "run_at": "document_start"
     }
   ],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Block Site Settings"
+  },
+  
+  "options_page": "options.html",
+  
   "web_accessible_resources": [
     {
-      "resources": [ "blocked.html" ],
-      "matches": [ "<all_urls>" ]
+      "resources": ["blocked.html", "icons/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

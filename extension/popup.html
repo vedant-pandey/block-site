@@ -1,18 +1,196 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL Opener</title>
-    <link rel="stylesheet" href="popup.css">
+    <style>
+        body {
+            width: 320px;
+            padding: 20px;
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f8f9fa;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.4em;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .status-text {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.active {
+            background-color: #ff4757;
+        }
+        
+        .status-dot.inactive {
+            background-color: #2ed573;
+        }
+        
+        .status-dot.disabled {
+            background-color: #747d8c;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background-color: #ccc;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .toggle-switch.active {
+            background-color: #4CAF50;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+        
+        .schedule-info {
+            background: #f1f3f4;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        
+        .schedule-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .schedule-label {
+            color: #666;
+        }
+        
+        .schedule-value {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .current-time {
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+        
+        .btn-secondary {
+            background-color: #f1f3f4;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e8eaed;
+        }
+        
+        .next-change {
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 10px;
+            padding: 8px;
+            background: #fff3cd;
+            border-radius: 6px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+    </style>
 </head>
-
 <body>
-    <div class="container">
-        <button id="openUrlBtn" class="btn primary">Apply</button>
+    <div class="header">
+        <h1>🚫 Block Site</h1>
     </div>
+    
+    <div id="content" class="loading">
+        Loading...
+    </div>
+    
     <script src="popup.js"></script>
 </body>
-
 </html>

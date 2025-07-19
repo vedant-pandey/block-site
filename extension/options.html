@@ -1,24 +1,172 @@
-<!-- options.html -->
-<h2>Block Settings</h2>
-<label>Blocked Websites (comma separated):</label>
-<input type="text" id="blockedSites">
-<br>
-<label>Block Start Time (e.g., 07:00):</label>
-<input type="time" id="startTime">
-<label>Block End Time (e.g., 18:00):</label>
-<input type="time" id="endTime">
-<br>
-<label>Blocked Days:</label>
-<select id="blockedDays" multiple>
-  <option value="0">Sunday</option>
-  <option value="1">Monday</option>
-  <option value="2">Tuesday</option>
-  <option value="3">Wednesday</option>
-  <option value="4">Thursday</option>
-  <option value="5">Friday</option>
-  <option value="6">Saturday</option>
-</select>
-<br>
-<button id="saveBtn">Save</button>
-<script src="options.js"></script>
-
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Block Site Options</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        
+        .blocked-sites {
+            background-color: #fff3cd;
+        }
+        
+        .time-schedule {
+            background-color: #d1ecf1;
+        }
+        
+        .day-schedule {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .day-label {
+            width: 100px;
+            font-weight: bold;
+        }
+        
+        .time-inputs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+        
+        .time-input {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        
+        .enable-checkbox {
+            margin-right: 10px;
+        }
+        
+        #blockedSites {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            background-color: #45a049;
+        }
+        
+        .button.danger {
+            background-color: #f44336;
+        }
+        
+        .button.danger:hover {
+            background-color: #da190b;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .global-toggle {
+            margin: 15px 0;
+        }
+        
+        .global-toggle input[type="checkbox"] {
+            transform: scale(1.5);
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Block Site Extension Settings</h1>
+        
+        <div class="global-toggle">
+            <label>
+                <input type="checkbox" id="extensionEnabled" checked>
+                Enable Extension
+            </label>
+        </div>
+        
+        <div class="section blocked-sites">
+            <h3>Blocked Websites</h3>
+            <textarea id="blockedSites" placeholder="Enter one website per line:&#10;example.com&#10;social-media.com&#10;*.distracting-site.com"></textarea>
+            <div>
+                <button class="button" id="saveBlocked">Save Blocked Sites</button>
+                <button class="button danger" id="clearBlocked">Clear All</button>
+            </div>
+        </div>
+        
+        <div class="section time-schedule">
+            <h3>Daily Time Schedule</h3>
+            <p>Set when sites should be blocked for each day. Leave unchecked to block all day.</p>
+            
+            <div id="scheduleContainer">
+                <!-- Days will be populated by JavaScript -->
+            </div>
+            
+            <div>
+                <button class="button" id="saveSchedule">Save Schedule</button>
+                <button class="button danger" id="resetSchedule">Reset to Default</button>
+            </div>
+        </div>
+        
+        <div id="status" class="status" style="display: none;"></div>
+    </div>
+    
+    <script src="options.js"></script>
+</body>
+</html>
