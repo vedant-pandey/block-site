@@ -87,6 +87,34 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Save timer settings
+    function saveTimerSettings() {
+        const focusDuration = parseInt(document.getElementById('focusDuration').value) || 25;
+        const restDuration = parseInt(document.getElementById('restDuration').value) || 5;
+        const autoStartCycles = document.getElementById('autoStartCycles').checked;
+        const soundNotifications = document.getElementById('soundNotifications').checked;
+        
+        // Validate input
+        if (focusDuration < 1 || focusDuration > 120) {
+            showStatus('Focus duration must be between 1 and 120 minutes', 'error');
+            return;
+        }
+        
+        if (restDuration < 1 || restDuration > 60) {
+            showStatus('Rest duration must be between 1 and 60 minutes', 'error');
+            return;
+        }
+        
+        chrome.storage.sync.set({
+            focusDuration: focusDuration,
+            restDuration: restDuration,
+            autoStartCycles: autoStartCycles,
+            soundNotifications: soundNotifications
+        }, function() {
+            showStatus('Timer settings saved successfully!', 'success');
+        });
+    }
+
     // Save daily schedule
     function saveSchedule() {
         const schedule = [];
@@ -187,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners
     document.getElementById('saveBlocked').addEventListener('click', saveBlockedSites);
     document.getElementById('clearBlocked').addEventListener('click', clearBlockedSites);
+    document.getElementById('saveTimerSettings').addEventListener('click', saveTimerSettings);
     document.getElementById('saveSchedule').addEventListener('click', () => {
         if (validateTimes()) {
             saveSchedule();

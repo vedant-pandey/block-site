@@ -124,9 +124,55 @@
             margin: 15px 0;
         }
         
-        .global-toggle input[type="checkbox"] {
-            transform: scale(1.5);
+        .focus-timer {
+            background-color: #e8f5e8;
+        }
+        
+        .timer-settings {
+            margin: 20px 0;
+        }
+        
+        .timer-row {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .timer-label {
+            width: 140px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .timer-input {
+            width: 80px;
+            padding: 5px 8px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+        
+        .timer-unit {
+            color: #666;
+            margin-right: 20px;
+        }
+        
+        .timer-checkbox {
             margin-right: 10px;
+            transform: scale(1.3);
+        }
+        
+        .timer-desc {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .timer-controls {
+            text-align: center;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -150,9 +196,45 @@
             </div>
         </div>
         
+        <div class="section focus-timer">
+            <h3>🍅 Focus Timer (Pomodoro)</h3>
+            <p>Set focus and rest periods. When active, timer overrides daily schedule.</p>
+            
+            <div class="timer-settings">
+                <div class="timer-row">
+                    <label class="timer-label">Focus Duration:</label>
+                    <input type="number" id="focusDuration" min="1" max="120" value="25" class="timer-input">
+                    <span class="timer-unit">minutes</span>
+                </div>
+                
+                <div class="timer-row">
+                    <label class="timer-label">Rest Duration:</label>
+                    <input type="number" id="restDuration" min="1" max="60" value="5" class="timer-input">
+                    <span class="timer-unit">minutes</span>
+                </div>
+                
+                <div class="timer-row">
+                    <label class="timer-label">Auto-start cycles:</label>
+                    <input type="checkbox" id="autoStartCycles" class="timer-checkbox">
+                    <span class="timer-desc">Automatically start next timer when current ends</span>
+                </div>
+                
+                <div class="timer-row">
+                    <label class="timer-label">Sound notifications:</label>
+                    <input type="checkbox" id="soundNotifications" checked class="timer-checkbox">
+                    <span class="timer-desc">Play sound when timers start/end</span>
+                </div>
+            </div>
+            
+            <div class="timer-controls">
+                <button class="button" id="saveTimerSettings">Save Timer Settings</button>
+            </div>
+        </div>
+
         <div class="section time-schedule">
-            <h3>Daily Time Schedule</h3>
+            <h3>📅 Daily Time Schedule</h3>
             <p>Set when sites should be blocked for each day. Leave unchecked to block all day.</p>
+            <p><em>Note: Focus timer overrides daily schedule when active.</em></p>
             
             <div id="scheduleContainer">
                 <!-- Days will be populated by JavaScript -->

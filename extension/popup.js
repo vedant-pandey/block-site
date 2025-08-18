@@ -4,7 +4,24 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update time every second
     setInterval(updateCurrentTime, 1000);
+    
+    // Update timer display every second
+    setInterval(updateTimerDisplay, 1000);
 });
+
+function updateTimerDisplay() {
+    chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+        if (response && response.timerState && response.timerState.isRunning) {
+            const timerDisplay = document.getElementById('timerDisplay');
+            if (timerDisplay) {
+                const minutes = Math.floor(response.timerState.timeRemaining / 60);
+                const seconds = response.timerState.timeRemaining % 60;
+                const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                timerDisplay.textContent = timeDisplay;
+            }
+        }
+    });
+}
 
 function loadPopupContent() {
     // Get status from background script
@@ -31,6 +48,17 @@ function renderPopupContent(status) {
         statusText = 'Extension Disabled';
         statusClass = 'disabled';
         statusIcon = '⏸️';
+    } else if (status.timerState && status.timerState.isRunning) {
+        // Timer is running - show timer status
+        if (status.timerState.currentPhase === 'focus') {
+            statusText = 'Focus Timer Active';
+            statusClass = 'active';
+            statusIcon = '🍅';
+        } else {
+            statusText = 'Rest Timer Active';
+            statusClass = 'inactive';
+            statusIcon = '☕';
+        }
     } else if (status.blocking) {
         statusText = 'Blocking Active';
         statusClass = 'active';
@@ -41,7 +69,14 @@ function renderPopupContent(status) {
         statusIcon = '✅';
     }
     
+    let timerSection = '';
+    if (status.timerState) {
+        timerSection = renderTimerSection(status.timerState);
+    }
+    
     content.innerHTML = `
+        ${timerSection}
+        
         <div class="status-card">
             <div class="status-indicator">
                 <div class="status-text">
@@ -66,7 +101,7 @@ function renderPopupContent(status) {
                 </div>
             </div>
             
-            ${status.nextChange ? `<div class="next-change" id="nextChange">
+            ${status.nextChange && !status.timerState?.isRunning ? `<div class="next-change" id="nextChange">
                 Next change: ${formatNextChange(status.nextChange)}
             </div>` : ''}
             
@@ -84,8 +119,113 @@ function renderPopupContent(status) {
     document.getElementById('quickToggleBtn').addEventListener('click', toggleExtension);
     document.getElementById('optionsBtn').addEventListener('click', openOptions);
     
+    // Add timer control listeners
+    addTimerEventListeners();
+    
     // Update current time
     updateCurrentTime();
+}
+
+function renderTimerSection(timerState) {
+    if (!timerState) return '';
+    
+    const minutes = Math.floor(timerState.timeRemaining / 60);
+    const seconds = timerState.timeRemaining % 60;
+    const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    
+    const phaseIcon = timerState.currentPhase === 'focus' ? '🍅' : '☕';
+    const phaseText = timerState.currentPhase === 'focus' ? 'Focus Time' : 'Rest Time';
+    
+    if (!timerState.isRunning) {
+        // Timer not running - show start options
+        return `
+            <div class="timer-section">
+                <div class="timer-phase">🍅 Start Focus Timer</div>
+                <div class="timer-controls">
+                    <button class="timer-btn primary" id="startFocusBtn">Start Focus</button>
+                    <button class="timer-btn" id="startRestBtn">Start Rest</button>
+                </div>
+            </div>
+        `;
+    }
+    
+    return `
+        <div class="timer-section">
+            <div class="timer-phase">
+                <span class="phase-indicator">${phaseIcon}</span>
+                ${phaseText}
+                ${timerState.isPaused ? ' (Paused)' : ''}
+            </div>
+            <div class="timer-display" id="timerDisplay">${timeDisplay}</div>
+            <div class="timer-controls">
+                ${timerState.isPaused ? 
+                    '<button class="timer-btn primary" id="resumeBtn">Resume</button>' :
+                    '<button class="timer-btn" id="pauseBtn">Pause</button>'
+                }
+                <button class="timer-btn" id="stopBtn">Stop</button>
+            </div>
+        </div>
+    `;
+}
+
+function addTimerEventListeners() {
+    const startFocusBtn = document.getElementById('startFocusBtn');
+    const startRestBtn = document.getElementById('startRestBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    
+    if (startFocusBtn) {
+        startFocusBtn.addEventListener('click', () => startTimer('focus'));
+    }
+    
+    if (startRestBtn) {
+        startRestBtn.addEventListener('click', () => startTimer('rest'));
+    }
+    
+    if (pauseBtn) {
+        pauseBtn.addEventListener('click', pauseTimer);
+    }
+    
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', resumeTimer);
+    }
+    
+    if (stopBtn) {
+        stopBtn.addEventListener('click', stopTimer);
+    }
+}
+
+function startTimer(phase) {
+    chrome.runtime.sendMessage({action: 'startTimer', phase: phase}, function(response) {
+        if (response && response.success) {
+            loadPopupContent();
+        }
+    });
+}
+
+function pauseTimer() {
+    chrome.runtime.sendMessage({action: 'pauseTimer'}, function(response) {
+        if (response && response.success) {
+            loadPopupContent();
+        }
+    });
+}
+
+function resumeTimer() {
+    chrome.runtime.sendMessage({action: 'resumeTimer'}, function(response) {
+        if (response && response.success) {
+            loadPopupContent();
+        }
+    });
+}
+
+function stopTimer() {
+    chrome.runtime.sendMessage({action: 'stopTimer'}, function(response) {
+        if (response && response.success) {
+            loadPopupContent();
+        }
+    });
 }
 
 function loadScheduleInfo() {

@@ -1,7 +1,18 @@
 // background.js
 class TimeBasedBlocker {
     constructor() {
+        this.timerState = {
+            isRunning: false,
+            isPaused: false,
+            currentPhase: 'focus', // 'focus' or 'rest'
+            timeRemaining: 0, // in seconds
+            startTime: null,
+            pausedTime: 0
+        };
+        
         this.initializeListeners();
+        this.loadTimerState();
+        this.startTimerTick();
     }
     
     initializeListeners() {
@@ -29,9 +40,14 @@ class TimeBasedBlocker {
             const isExtensionEnabled = await this.getExtensionState();
             if (!isExtensionEnabled) return;
             
-            // Check if current time is within blocking hours
+            // Check timer state first (timer overrides daily schedule)
+            const shouldBlockByTimer = await this.shouldBlockByTimer();
             const shouldBlockByTime = await this.isWithinBlockingHours();
-            if (!shouldBlockByTime) return;
+            
+            // Block if timer says to block OR if daily schedule says to block and no timer is running
+            const shouldBlock = shouldBlockByTimer || (!this.timerState.isRunning && shouldBlockByTime);
+            
+            if (!shouldBlock) return;
             
             // Check if site is in blocked list
             const isBlocked = await this.isSiteBlocked(url);
@@ -45,6 +61,163 @@ class TimeBasedBlocker {
         }
     }
     
+    shouldBlockByTimer() {
+        return Promise.resolve(
+            this.timerState.isRunning && 
+            !this.timerState.isPaused && 
+            this.timerState.currentPhase === 'focus'
+        );
+    }
+    
+    async loadTimerState() {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['timerState'], (result) => {
+                if (result.timerState) {
+                    this.timerState = { ...this.timerState, ...result.timerState };
+                    
+                    // Recalculate time remaining if timer was running
+                    if (this.timerState.isRunning && !this.timerState.isPaused && this.timerState.startTime) {
+                        const elapsed = Math.floor((Date.now() - this.timerState.startTime - this.timerState.pausedTime) / 1000);
+                        this.timerState.timeRemaining = Math.max(0, this.timerState.timeRemaining - elapsed);
+                        
+                        if (this.timerState.timeRemaining <= 0) {
+                            this.completeCurrentPhase();
+                        }
+                    }
+                }
+                resolve();
+            });
+        });
+    }
+    
+    saveTimerState() {
+        chrome.storage.local.set({ timerState: this.timerState });
+    }
+    
+    startTimer(phase = 'focus') {
+        return new Promise((resolve) => {
+            chrome.storage.sync.get(['focusDuration', 'restDuration'], (result) => {
+                const focusDuration = result.focusDuration || 25;
+                const restDuration = result.restDuration || 5;
+                
+                this.timerState = {
+                    isRunning: true,
+                    isPaused: false,
+                    currentPhase: phase,
+                    timeRemaining: (phase === 'focus' ? focusDuration : restDuration) * 60,
+                    startTime: Date.now(),
+                    pausedTime: 0
+                };
+                
+                this.saveTimerState();
+                this.updateBadge();
+                this.showNotification(`${phase === 'focus' ? 'Focus' : 'Rest'} timer started!`);
+                resolve(this.timerState);
+            });
+        });
+    }
+    
+    pauseTimer() {
+        if (this.timerState.isRunning && !this.timerState.isPaused) {
+            this.timerState.isPaused = true;
+            this.timerState.pausedTime += Date.now() - this.timerState.startTime;
+            this.saveTimerState();
+            this.updateBadge();
+        }
+        return this.timerState;
+    }
+    
+    resumeTimer() {
+        if (this.timerState.isRunning && this.timerState.isPaused) {
+            this.timerState.isPaused = false;
+            this.timerState.startTime = Date.now();
+            this.saveTimerState();
+            this.updateBadge();
+        }
+        return this.timerState;
+    }
+    
+    stopTimer() {
+        this.timerState = {
+            isRunning: false,
+            isPaused: false,
+            currentPhase: 'focus',
+            timeRemaining: 0,
+            startTime: null,
+            pausedTime: 0
+        };
+        
+        this.saveTimerState();
+        this.updateBadge();
+        return this.timerState;
+    }
+    
+    async completeCurrentPhase() {
+        const currentPhase = this.timerState.currentPhase;
+        const nextPhase = currentPhase === 'focus' ? 'rest' : 'focus';
+        
+        // Show completion notification
+        this.showNotification(`${currentPhase === 'focus' ? 'Focus' : 'Rest'} time complete!`);
+        this.playNotificationSound();
+        
+        // Check auto-start setting
+        const result = await new Promise(resolve => {
+            chrome.storage.sync.get(['autoStartCycles'], resolve);
+        });
+        
+        if (result.autoStartCycles) {
+            // Auto-start next phase
+            setTimeout(() => {
+                this.startTimer(nextPhase);
+            }, 1000);
+        } else {
+            // Stop timer and wait for manual start
+            this.stopTimer();
+        }
+    }
+    
+    startTimerTick() {
+        setInterval(() => {
+            if (this.timerState.isRunning && !this.timerState.isPaused) {
+                const elapsed = Math.floor((Date.now() - this.timerState.startTime - this.timerState.pausedTime) / 1000);
+                const newTimeRemaining = Math.max(0, this.timerState.timeRemaining - elapsed);
+                
+                if (newTimeRemaining <= 0 && this.timerState.timeRemaining > 0) {
+                    this.completeCurrentPhase();
+                } else {
+                    this.timerState.timeRemaining = newTimeRemaining;
+                    this.updateBadge();
+                }
+            }
+        }, 1000);
+    }
+    
+    showNotification(message) {
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon48.png',
+            title: 'Block Site Timer',
+            message: message
+        });
+    }
+    
+    async playNotificationSound() {
+        const result = await new Promise(resolve => {
+            chrome.storage.sync.get(['soundNotifications'], resolve);
+        });
+        
+        if (result.soundNotifications !== false) {
+            // Create an audio context to play notification sound
+            chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
+                if (tabs[0]) {
+                    chrome.tabs.sendMessage(tabs[0].id, {action: 'playNotificationSound'}).catch(() => {
+                        // Ignore errors if content script not available
+                    });
+                }
+            });
+        }
+    }
+
     getExtensionState() {
         return new Promise((resolve) => {
             chrome.storage.sync.get(['extensionEnabled'], (result) => {
@@ -184,17 +357,43 @@ class TimeBasedBlocker {
     async checkTimeBasedBlocking() {
         const isWithinHours = await this.isWithinBlockingHours();
         const isExtensionEnabled = await this.getExtensionState();
+        const shouldBlockByTimer = await this.shouldBlockByTimer();
         
-        // Update badge to show current status
-        if (!isExtensionEnabled) {
-            chrome.action.setBadgeText({ text: 'OFF' });
-            chrome.action.setBadgeBackgroundColor({ color: '#666666' });
-        } else if (isWithinHours) {
-            chrome.action.setBadgeText({ text: 'ON' });
-            chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
-        } else {
-            chrome.action.setBadgeText({ text: '' });
-        }
+        this.updateBadge();
+    }
+    
+    updateBadge() {
+        chrome.storage.sync.get(['extensionEnabled'], (result) => {
+            const isExtensionEnabled = result.extensionEnabled !== false;
+            
+            if (!isExtensionEnabled) {
+                chrome.action.setBadgeText({ text: 'OFF' });
+                chrome.action.setBadgeBackgroundColor({ color: '#666666' });
+            } else if (this.timerState.isRunning) {
+                // Show timer info in badge
+                if (this.timerState.isPaused) {
+                    chrome.action.setBadgeText({ text: '⏸️' });
+                    chrome.action.setBadgeBackgroundColor({ color: '#ff9500' });
+                } else {
+                    const minutes = Math.ceil(this.timerState.timeRemaining / 60);
+                    const phase = this.timerState.currentPhase === 'focus' ? '🍅' : '☕';
+                    chrome.action.setBadgeText({ text: minutes > 99 ? '99+' : minutes.toString() });
+                    chrome.action.setBadgeBackgroundColor({ 
+                        color: this.timerState.currentPhase === 'focus' ? '#ff4444' : '#4CAF50' 
+                    });
+                }
+            } else {
+                // Fall back to regular schedule-based badge
+                this.isWithinBlockingHours().then(isWithinHours => {
+                    if (isWithinHours) {
+                        chrome.action.setBadgeText({ text: 'ON' });
+                        chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
+                    } else {
+                        chrome.action.setBadgeText({ text: '' });
+                    }
+                });
+            }
+        });
     }
     
     // Get next schedule change time for display
@@ -253,25 +452,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         Promise.all([
             timeBasedBlocker.getExtensionState(),
             timeBasedBlocker.isWithinBlockingHours(),
-            timeBasedBlocker.getNextScheduleChange()
-        ]).then(([isEnabled, isBlocking, nextChange]) => {
+            timeBasedBlocker.getNextScheduleChange(),
+            timeBasedBlocker.shouldBlockByTimer()
+        ]).then(([isEnabled, isBlocking, nextChange, isTimerBlocking]) => {
             sendResponse({
                 enabled: isEnabled,
-                blocking: isBlocking,
-                nextChange: nextChange
+                blocking: isBlocking || isTimerBlocking,
+                nextChange: nextChange,
+                timerState: timeBasedBlocker.timerState
             });
         });
-        return true; // Indicates we will send response asynchronously
+        return true;
     }
     
     if (request.action === 'toggleExtension') {
         chrome.storage.sync.get(['extensionEnabled'], (result) => {
             const newState = !result.extensionEnabled;
             chrome.storage.sync.set({ extensionEnabled: newState }, () => {
+                timeBasedBlocker.updateBadge();
                 sendResponse({ enabled: newState });
             });
         });
         return true;
+    }
+    
+    if (request.action === 'startTimer') {
+        timeBasedBlocker.startTimer(request.phase).then(state => {
+            sendResponse({ success: true, timerState: state });
+        });
+        return true;
+    }
+    
+    if (request.action === 'pauseTimer') {
+        const state = timeBasedBlocker.pauseTimer();
+        sendResponse({ success: true, timerState: state });
+    }
+    
+    if (request.action === 'resumeTimer') {
+        const state = timeBasedBlocker.resumeTimer();
+        sendResponse({ success: true, timerState: state });
+    }
+    
+    if (request.action === 'stopTimer') {
+        const state = timeBasedBlocker.stopTimer();
+        sendResponse({ success: true, timerState: state });
+    }
+    
+    if (request.action === 'getTimerState') {
+        sendResponse({ timerState: timeBasedBlocker.timerState });
     }
 });
 

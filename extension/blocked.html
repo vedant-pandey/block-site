@@ -169,13 +169,31 @@
         
         // Load schedule information
         function loadScheduleInfo() {
-            chrome.storage.sync.get(['dailySchedule'], (result) => {
+            Promise.all([
+                new Promise(resolve => chrome.storage.sync.get(['dailySchedule'], resolve)),
+                new Promise(resolve => chrome.storage.local.get(['timerState'], resolve))
+            ]).then(([scheduleResult, timerResult]) => {
                 const now = new Date();
                 const dayIndex = now.getDay();
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 
-                if (result.dailySchedule && result.dailySchedule[dayIndex]) {
-                    const schedule = result.dailySchedule[dayIndex];
+                // Check if timer is active
+                if (timerResult.timerState && timerResult.timerState.isRunning && timerResult.timerState.currentPhase === 'focus') {
+                    const timerState = timerResult.timerState;
+                    const minutes = Math.ceil(timerState.timeRemaining / 60);
+                    
+                    document.getElementById('scheduleInfo').innerHTML = `
+                        <div>🍅 Focus Timer Active</div>
+                        <div class="next-access" style="color: #ff6b6b;">
+                            ${minutes} minute${minutes !== 1 ? 's' : ''} remaining
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Fall back to regular schedule display
+                if (scheduleResult.dailySchedule && scheduleResult.dailySchedule[dayIndex]) {
+                    const schedule = scheduleResult.dailySchedule[dayIndex];
                     const dayName = days[dayIndex];
                     
                     if (schedule.enabled) {
