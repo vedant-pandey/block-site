@@ -11,13 +11,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function updateTimerDisplay() {
     chrome.runtime.sendMessage({action: 'getTimerState'}, function(response) {
+        if (chrome.runtime.lastError) return;
+        
         if (response && response.timerState && response.timerState.isRunning) {
             const timerDisplay = document.getElementById('timerDisplay');
-            if (timerDisplay) {
+            if (timerDisplay && response.timerState.timeRemaining >= 0) {
                 const minutes = Math.floor(response.timerState.timeRemaining / 60);
                 const seconds = response.timerState.timeRemaining % 60;
                 const timeDisplay = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 timerDisplay.textContent = timeDisplay;
+                
+                // If timer completed, refresh the popup
+                if (response.timerState.timeRemaining === 0) {
+                    setTimeout(() => loadPopupContent(), 1000);
+                }
             }
         }
     });
@@ -32,15 +39,10 @@ function loadPopupContent() {
             showError();
         }
     });
-    
-    // Also load schedule info
-    loadScheduleInfo();
 }
 
 function renderPopupContent(status) {
     const content = document.getElementById('content');
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const today = days[new Date().getDay()];
     
     let statusText, statusClass, statusIcon;
     
@@ -51,20 +53,16 @@ function renderPopupContent(status) {
     } else if (status.timerState && status.timerState.isRunning) {
         // Timer is running - show timer status
         if (status.timerState.currentPhase === 'focus') {
-            statusText = 'Focus Timer Active';
+            statusText = 'Focus Mode - Sites Blocked';
             statusClass = 'active';
             statusIcon = '🍅';
         } else {
-            statusText = 'Rest Timer Active';
+            statusText = 'Rest Mode - Sites Available';
             statusClass = 'inactive';
             statusIcon = '☕';
         }
-    } else if (status.blocking) {
-        statusText = 'Blocking Active';
-        statusClass = 'active';
-        statusIcon = '🚫';
     } else {
-        statusText = 'Not Blocking';
+        statusText = 'No Timer - Sites Available';
         statusClass = 'inactive';
         statusIcon = '✅';
     }
@@ -92,18 +90,20 @@ function renderPopupContent(status) {
             
             <div class="schedule-info" id="scheduleInfo">
                 <div class="schedule-row">
-                    <span class="schedule-label">Today (${today}):</span>
-                    <span class="schedule-value" id="todaySchedule">Loading...</span>
+                    <span class="schedule-label">Blocking Mode:</span>
+                    <span class="schedule-value">Focus Timer Only</span>
                 </div>
                 <div class="schedule-row">
-                    <span class="schedule-label">Status:</span>
+                    <span class="schedule-label">Current Status:</span>
                     <span class="schedule-value">${statusText}</span>
                 </div>
+                ${status.timerState && status.timerState.isRunning ? `
+                <div class="schedule-row">
+                    <span class="schedule-label">Access:</span>
+                    <span class="schedule-value">${status.timerState.currentPhase === 'focus' ? '🚫 Blocked' : '✅ Available'}</span>
+                </div>
+                ` : ''}
             </div>
-            
-            ${status.nextChange && !status.timerState?.isRunning ? `<div class="next-change" id="nextChange">
-                Next change: ${formatNextChange(status.nextChange)}
-            </div>` : ''}
             
             <div class="actions">
                 <button class="btn btn-secondary" id="optionsBtn">Settings</button>

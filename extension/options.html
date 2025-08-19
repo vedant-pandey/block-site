@@ -197,20 +197,20 @@
         </div>
         
         <div class="section focus-timer">
-            <h3>🍅 Focus Timer (Pomodoro)</h3>
-            <p>Set focus and rest periods. When active, timer overrides daily schedule.</p>
+            <h3>🍅 Focus Timer (Primary Blocking Control)</h3>
+            <p><strong>Websites are only blocked during Focus Timer sessions.</strong> Rest periods and no timer = full access.</p>
             
             <div class="timer-settings">
                 <div class="timer-row">
                     <label class="timer-label">Focus Duration:</label>
                     <input type="number" id="focusDuration" min="1" max="120" value="25" class="timer-input">
-                    <span class="timer-unit">minutes</span>
+                    <span class="timer-unit">minutes (sites blocked)</span>
                 </div>
                 
                 <div class="timer-row">
                     <label class="timer-label">Rest Duration:</label>
                     <input type="number" id="restDuration" min="1" max="60" value="5" class="timer-input">
-                    <span class="timer-unit">minutes</span>
+                    <span class="timer-unit">minutes (sites available)</span>
                 </div>
                 
                 <div class="timer-row">
@@ -231,18 +231,18 @@
             </div>
         </div>
 
-        <div class="section time-schedule">
+        <div class="section time-schedule" style="opacity: 0.6;">
             <h3>📅 Daily Time Schedule</h3>
+            <p><em>⚠️ Daily schedules are currently disabled. Only the Focus Timer above controls website blocking.</em></p>
             <p>Set when sites should be blocked for each day. Leave unchecked to block all day.</p>
-            <p><em>Note: Focus timer overrides daily schedule when active.</em></p>
             
             <div id="scheduleContainer">
                 <!-- Days will be populated by JavaScript -->
             </div>
             
             <div>
-                <button class="button" id="saveSchedule">Save Schedule</button>
-                <button class="button danger" id="resetSchedule">Reset to Default</button>
+                <button class="button" id="saveSchedule" disabled title="Daily schedules are currently disabled">Save Schedule</button>
+                <button class="button danger" id="resetSchedule" disabled title="Daily schedules are currently disabled">Reset to Default</button>
             </div>
         </div>
         

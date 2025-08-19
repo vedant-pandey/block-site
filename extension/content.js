@@ -1,16 +1,16 @@
 // content.js
 (function() {
     'use strict';
-    
+
     // Check if we should block this page
     function checkAndBlock() {
-        chrome.runtime.sendMessage({action: 'getStatus'}, function(response) {
+        chrome.runtime.sendMessage({ action: 'getStatus' }, function(response) {
             if (chrome.runtime.lastError) return;
-            
+
+            // Only block if extension is enabled AND focus timer is active
             if (response && response.enabled && response.blocking) {
-                // Additional content-level blocking
                 const hostname = window.location.hostname;
-                
+
                 chrome.storage.sync.get(['blockedSites'], function(result) {
                     if (result.blockedSites && Array.isArray(result.blockedSites)) {
                         for (const site of result.blockedSites) {
@@ -24,14 +24,14 @@
             }
         });
     }
-    
+
     function matchesSite(hostname, pattern) {
         // Remove protocol if present
         pattern = pattern.replace(/^https?:\/\//, '');
-        
+
         // Exact match
         if (hostname === pattern) return true;
-        
+
         // Wildcard support
         if (pattern.includes('*')) {
             const regexPattern = pattern
@@ -40,13 +40,13 @@
             const regex = new RegExp(`^${regexPattern}$`);
             return regex.test(hostname);
         }
-        
+
         // Subdomain matching
         if (hostname.endsWith('.' + pattern)) return true;
-        
+
         return false;
     }
-    
+
     function blockPage() {
         // Create overlay for immediate blocking
         const overlay = document.createElement('div');
@@ -65,16 +65,19 @@
             font-family: 'Segoe UI', system-ui, sans-serif !important;
             text-align: center !important;
         `;
-        
+
         overlay.innerHTML = `
             <div style="max-width: 500px; padding: 40px;">
-                <div style="font-size: 4em; margin-bottom: 20px;">🚫</div>
-                <h1 style="font-size: 2.5em; margin: 0 0 20px 0; font-weight: 300;">Site Blocked</h1>
+                <div style="font-size: 4em; margin-bottom: 20px;">🍅</div>
+                <h1 style="font-size: 2.5em; margin: 0 0 20px 0; font-weight: 300;">Focus Mode Active</h1>
                 <div style="font-size: 1.2em; margin: 20px 0;">
-                    <strong>${window.location.hostname}</strong> is blocked during your scheduled focus time.
+                    <strong>${window.location.hostname}</strong> is blocked during your focus session.
                 </div>
                 <div style="margin: 30px 0; font-size: 1.1em; opacity: 0.9;">
                     Current time: <span id="currentTime" style="font-family: monospace; color: #4ecdc4;">${new Date().toLocaleTimeString()}</span>
+                </div>
+                <div style="margin: 20px 0; font-size: 1em; opacity: 0.8;">
+                    💡 Sites are available during rest breaks and when no timer is running
                 </div>
                 <button onclick="window.history.back()" style="
                     background: rgba(255,255,255,0.2);
@@ -88,12 +91,12 @@
                 ">← Go Back</button>
             </div>
         `;
-        
+
         // Remove any existing content
         document.documentElement.innerHTML = '';
         document.body = document.createElement('body');
         document.body.appendChild(overlay);
-        
+
         // Update time every second
         setInterval(function() {
             const timeElement = document.getElementById('currentTime');
@@ -101,55 +104,55 @@
                 timeElement.textContent = new Date().toLocaleTimeString();
             }
         }, 1000);
-        
+
         // Prevent navigation
         window.addEventListener('beforeunload', function(e) {
             e.preventDefault();
-            return 'This site is blocked during your focus time.';
+            return 'This site is blocked during your focus session.';
         });
-        
+
         // Redirect to blocked page after a short delay
         setTimeout(function() {
-            const blockedPageUrl = chrome.runtime.getURL('blocked.html') + 
-                '?site=' + encodeURIComponent(window.location.hostname) + 
+            const blockedPageUrl = chrome.runtime.getURL('blocked.html') +
+                '?site=' + encodeURIComponent(window.location.hostname) +
                 '&time=' + encodeURIComponent(new Date().toLocaleTimeString());
             window.location.replace(blockedPageUrl);
         }, 2000);
     }
-    
+
     // Run check when page loads
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', checkAndBlock);
     } else {
         checkAndBlock();
     }
-    
-    
+
+
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.action === 'playNotificationSound') {
             playNotificationSound();
-            sendResponse({success: true});
+            sendResponse({ success: true });
         }
     });
-    
+
     function playNotificationSound() {
         try {
             // Create a simple notification sound
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
+
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
+
             oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
             oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
             oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-            
+
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
+
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
         } catch (error) {
@@ -166,5 +169,5 @@
             checkAndBlock();
         }
     }).observe(document, { subtree: true, childList: true });
-    
+
 })();

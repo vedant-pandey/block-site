@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Site Blocked</title>
+    <title>Focus Mode Active</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -121,8 +121,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="icon">🚫</div>
-        <h1>Access Blocked</h1>
+        <div class="icon">🍅</div>
+        <h1>Focus Mode Active</h1>
         
         <div class="blocked-site" id="siteName">
             Loading...
@@ -144,7 +144,7 @@
         </div>
         
         <div class="productivity-tip" id="tip">
-            💡 Use this time to focus on your important tasks!
+            🍅 Focus time! Use this session to accomplish your important work.
         </div>
     </div>
 
@@ -169,71 +169,45 @@
         
         // Load schedule information
         function loadScheduleInfo() {
-            Promise.all([
-                new Promise(resolve => chrome.storage.sync.get(['dailySchedule'], resolve)),
-                new Promise(resolve => chrome.storage.local.get(['timerState'], resolve))
-            ]).then(([scheduleResult, timerResult]) => {
-                const now = new Date();
-                const dayIndex = now.getDay();
-                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                
+            chrome.storage.local.get(['timerState'], (timerResult) => {
                 // Check if timer is active
                 if (timerResult.timerState && timerResult.timerState.isRunning && timerResult.timerState.currentPhase === 'focus') {
                     const timerState = timerResult.timerState;
                     const minutes = Math.ceil(timerState.timeRemaining / 60);
                     
                     document.getElementById('scheduleInfo').innerHTML = `
-                        <div>🍅 Focus Timer Active</div>
+                        <div>🍅 <strong>Focus Timer Active</strong></div>
                         <div class="next-access" style="color: #ff6b6b;">
-                            ${minutes} minute${minutes !== 1 ? 's' : ''} remaining
+                            ${minutes} minute${minutes !== 1 ? 's' : ''} remaining until rest break
+                        </div>
+                        <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                            Sites are only blocked during focus sessions
                         </div>
                     `;
-                    return;
-                }
-                
-                // Fall back to regular schedule display
-                if (scheduleResult.dailySchedule && scheduleResult.dailySchedule[dayIndex]) {
-                    const schedule = scheduleResult.dailySchedule[dayIndex];
-                    const dayName = days[dayIndex];
-                    
-                    if (schedule.enabled) {
-                        document.getElementById('todaySchedule').textContent = 
-                            `${dayName}: ${schedule.startTime} - ${schedule.endTime}`;
-                        
-                        // Calculate next access time
-                        const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
-                        const nextAccess = new Date();
-                        nextAccess.setHours(endHour, endMinute, 0, 0);
-                        
-                        if (nextAccess <= now) {
-                            nextAccess.setDate(nextAccess.getDate() + 1);
-                        }
-                        
-                        document.getElementById('nextAccess').textContent = 
-                            `Next access available: ${nextAccess.toLocaleString()}`;
-                    } else {
-                        document.getElementById('scheduleInfo').innerHTML = 
-                            '<div>📅 Blocking is disabled for today</div>';
-                    }
                 } else {
-                    document.getElementById('scheduleInfo').innerHTML = 
-                        '<div>📅 24/7 blocking is active</div>';
+                    // This shouldn't happen since we only block during focus timer
+                    document.getElementById('scheduleInfo').innerHTML = `
+                        <div>🤔 <strong>Unexpected Block</strong></div>
+                        <div style="color: #ff6b6b;">
+                            You should only see this during focus timer sessions
+                        </div>
+                    `;
                 }
             });
         }
         
         // Load productivity tips
         const tips = [
-            "💡 Use this time to focus on your important tasks!",
-            "🎯 Take a deep breath and prioritize your goals",
-            "📚 Perfect time to read that book you've been meaning to start",
-            "🏃‍♂️ Why not take a quick walk and get some fresh air?",
-            "🧘‍♀️ Consider a few minutes of meditation or mindfulness",
-            "💪 Use this momentum to tackle challenging work tasks",
-            "🎨 Channel your energy into something creative",
-            "📞 Good time to call a friend or family member",
-            "📝 Write down your thoughts or plan your day",
-            "🌱 Water your plants or do a quick household task"
+            "🍅 Focus time! Use this session to accomplish your important work.",
+            "🎯 Stay focused - this distraction will be available during your break",
+            "📚 Perfect time to dive deep into that challenging project",
+            "🧘‍♀️ Take a deep breath and refocus on your priorities",
+            "💪 Use this momentum to tackle your most important task",
+            "🔥 This is your productive time - make it count!",
+            "📝 Write down your thoughts and get back to focused work",
+            "🎨 Channel your energy into meaningful, focused work",
+            "🌱 Let your focus grow - resist the urge to multitask",
+            "⏰ Remember: rest break is coming soon!"
         ];
         
         document.getElementById('tip').textContent = tips[Math.floor(Math.random() * tips.length)];

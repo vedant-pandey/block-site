@@ -6,13 +6,16 @@ class TimeBasedBlocker {
             isPaused: false,
             currentPhase: 'focus', // 'focus' or 'rest'
             timeRemaining: 0, // in seconds
+            originalDuration: 0, // in seconds
             startTime: null,
             pausedTime: 0
         };
         
         this.initializeListeners();
-        this.loadTimerState();
-        this.startTimerTick();
+        this.loadTimerState().then(() => {
+            this.startTimerTick();
+            this.updateBadge();
+        });
     }
     
     initializeListeners() {
@@ -40,14 +43,9 @@ class TimeBasedBlocker {
             const isExtensionEnabled = await this.getExtensionState();
             if (!isExtensionEnabled) return;
             
-            // Check timer state first (timer overrides daily schedule)
+            // Only block when focus timer is active
             const shouldBlockByTimer = await this.shouldBlockByTimer();
-            const shouldBlockByTime = await this.isWithinBlockingHours();
-            
-            // Block if timer says to block OR if daily schedule says to block and no timer is running
-            const shouldBlock = shouldBlockByTimer || (!this.timerState.isRunning && shouldBlockByTime);
-            
-            if (!shouldBlock) return;
+            if (!shouldBlockByTimer) return;
             
             // Check if site is in blocked list
             const isBlocked = await this.isSiteBlocked(url);
@@ -62,11 +60,13 @@ class TimeBasedBlocker {
     }
     
     shouldBlockByTimer() {
-        return Promise.resolve(
-            this.timerState.isRunning && 
-            !this.timerState.isPaused && 
-            this.timerState.currentPhase === 'focus'
-        );
+        // Only block during focus phase when timer is running and not paused
+        const isBlocking = this.timerState.isRunning && 
+                          !this.timerState.isPaused && 
+                          this.timerState.currentPhase === 'focus' &&
+                          this.timerState.timeRemaining > 0;
+        
+        return Promise.resolve(isBlocking);
     }
     
     async loadTimerState() {
@@ -75,13 +75,17 @@ class TimeBasedBlocker {
                 if (result.timerState) {
                     this.timerState = { ...this.timerState, ...result.timerState };
                     
-                    // Recalculate time remaining if timer was running
-                    if (this.timerState.isRunning && !this.timerState.isPaused && this.timerState.startTime) {
-                        const elapsed = Math.floor((Date.now() - this.timerState.startTime - this.timerState.pausedTime) / 1000);
-                        this.timerState.timeRemaining = Math.max(0, this.timerState.timeRemaining - elapsed);
+                    // If timer was running, recalculate time remaining
+                    if (this.timerState.isRunning && !this.timerState.isPaused) {
+                        const now = Date.now();
+                        const totalElapsed = Math.floor((now - this.timerState.startTime) / 1000);
+                        const remainingTime = this.timerState.originalDuration - totalElapsed;
                         
-                        if (this.timerState.timeRemaining <= 0) {
+                        if (remainingTime <= 0) {
+                            // Timer should have completed while away
                             this.completeCurrentPhase();
+                        } else {
+                            this.timerState.timeRemaining = remainingTime;
                         }
                     }
                 }
@@ -99,19 +103,21 @@ class TimeBasedBlocker {
             chrome.storage.sync.get(['focusDuration', 'restDuration'], (result) => {
                 const focusDuration = result.focusDuration || 25;
                 const restDuration = result.restDuration || 5;
+                const duration = (phase === 'focus' ? focusDuration : restDuration) * 60;
                 
                 this.timerState = {
                     isRunning: true,
                     isPaused: false,
                     currentPhase: phase,
-                    timeRemaining: (phase === 'focus' ? focusDuration : restDuration) * 60,
+                    timeRemaining: duration,
+                    originalDuration: duration,
                     startTime: Date.now(),
                     pausedTime: 0
                 };
                 
                 this.saveTimerState();
                 this.updateBadge();
-                this.showNotification(`${phase === 'focus' ? 'Focus' : 'Rest'} timer started!`);
+                this.showNotification(`${phase === 'focus' ? 'Focus' : 'Rest'} timer started! (${Math.ceil(duration/60)} minutes)`);
                 resolve(this.timerState);
             });
         });
@@ -119,8 +125,12 @@ class TimeBasedBlocker {
     
     pauseTimer() {
         if (this.timerState.isRunning && !this.timerState.isPaused) {
+            // Calculate current remaining time
+            const elapsed = Math.floor((Date.now() - this.timerState.startTime) / 1000);
+            this.timerState.timeRemaining = Math.max(0, this.timerState.originalDuration - elapsed);
+            
             this.timerState.isPaused = true;
-            this.timerState.pausedTime += Date.now() - this.timerState.startTime;
+            this.timerState.pausedAt = Date.now();
             this.saveTimerState();
             this.updateBadge();
         }
@@ -129,8 +139,12 @@ class TimeBasedBlocker {
     
     resumeTimer() {
         if (this.timerState.isRunning && this.timerState.isPaused) {
+            // Adjust start time to account for paused duration
+            const pausedDuration = Date.now() - this.timerState.pausedAt;
+            this.timerState.startTime += pausedDuration;
             this.timerState.isPaused = false;
-            this.timerState.startTime = Date.now();
+            delete this.timerState.pausedAt;
+            
             this.saveTimerState();
             this.updateBadge();
         }
@@ -143,6 +157,7 @@ class TimeBasedBlocker {
             isPaused: false,
             currentPhase: 'focus',
             timeRemaining: 0,
+            originalDuration: 0,
             startTime: null,
             pausedTime: 0
         };
@@ -157,7 +172,7 @@ class TimeBasedBlocker {
         const nextPhase = currentPhase === 'focus' ? 'rest' : 'focus';
         
         // Show completion notification
-        this.showNotification(`${currentPhase === 'focus' ? 'Focus' : 'Rest'} time complete!`);
+        this.showNotification(`${currentPhase === 'focus' ? 'Focus' : 'Rest'} session complete!`);
         this.playNotificationSound();
         
         // Check auto-start setting
@@ -166,10 +181,10 @@ class TimeBasedBlocker {
         });
         
         if (result.autoStartCycles) {
-            // Auto-start next phase
+            // Auto-start next phase after a brief delay
             setTimeout(() => {
                 this.startTimer(nextPhase);
-            }, 1000);
+            }, 2000);
         } else {
             // Stop timer and wait for manual start
             this.stopTimer();
@@ -179,14 +194,21 @@ class TimeBasedBlocker {
     startTimerTick() {
         setInterval(() => {
             if (this.timerState.isRunning && !this.timerState.isPaused) {
-                const elapsed = Math.floor((Date.now() - this.timerState.startTime - this.timerState.pausedTime) / 1000);
-                const newTimeRemaining = Math.max(0, this.timerState.timeRemaining - elapsed);
+                const elapsed = Math.floor((Date.now() - this.timerState.startTime) / 1000);
+                const newTimeRemaining = Math.max(0, this.timerState.originalDuration - elapsed);
                 
                 if (newTimeRemaining <= 0 && this.timerState.timeRemaining > 0) {
+                    // Timer just completed
+                    this.timerState.timeRemaining = 0;
                     this.completeCurrentPhase();
                 } else {
                     this.timerState.timeRemaining = newTimeRemaining;
                     this.updateBadge();
+                    
+                    // Save state periodically (every 10 seconds) to handle crashes
+                    if (elapsed % 10 === 0) {
+                        this.saveTimerState();
+                    }
                 }
             }
         }, 1000);
@@ -355,10 +377,6 @@ class TimeBasedBlocker {
     }
     
     async checkTimeBasedBlocking() {
-        const isWithinHours = await this.isWithinBlockingHours();
-        const isExtensionEnabled = await this.getExtensionState();
-        const shouldBlockByTimer = await this.shouldBlockByTimer();
-        
         this.updateBadge();
     }
     
@@ -376,22 +394,14 @@ class TimeBasedBlocker {
                     chrome.action.setBadgeBackgroundColor({ color: '#ff9500' });
                 } else {
                     const minutes = Math.ceil(this.timerState.timeRemaining / 60);
-                    const phase = this.timerState.currentPhase === 'focus' ? '🍅' : '☕';
                     chrome.action.setBadgeText({ text: minutes > 99 ? '99+' : minutes.toString() });
                     chrome.action.setBadgeBackgroundColor({ 
                         color: this.timerState.currentPhase === 'focus' ? '#ff4444' : '#4CAF50' 
                     });
                 }
             } else {
-                // Fall back to regular schedule-based badge
-                this.isWithinBlockingHours().then(isWithinHours => {
-                    if (isWithinHours) {
-                        chrome.action.setBadgeText({ text: 'ON' });
-                        chrome.action.setBadgeBackgroundColor({ color: '#ff4444' });
-                    } else {
-                        chrome.action.setBadgeText({ text: '' });
-                    }
-                });
+                // No timer running - no blocking active
+                chrome.action.setBadgeText({ text: '' });
             }
         });
     }
@@ -451,14 +461,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getStatus') {
         Promise.all([
             timeBasedBlocker.getExtensionState(),
-            timeBasedBlocker.isWithinBlockingHours(),
-            timeBasedBlocker.getNextScheduleChange(),
             timeBasedBlocker.shouldBlockByTimer()
-        ]).then(([isEnabled, isBlocking, nextChange, isTimerBlocking]) => {
+        ]).then(([isEnabled, isTimerBlocking]) => {
             sendResponse({
                 enabled: isEnabled,
-                blocking: isBlocking || isTimerBlocking,
-                nextChange: nextChange,
+                blocking: isTimerBlocking, // Only blocking during focus timer
                 timerState: timeBasedBlocker.timerState
             });
         });
